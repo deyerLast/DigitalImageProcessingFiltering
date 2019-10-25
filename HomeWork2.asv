@@ -1,0 +1,227 @@
+%David Meyer
+%%Homework 2: Filters and Set Boundary
+
+clc 
+clear all
+close all
+%%
+picToRead='./sobel.png'; % path of the image
+%pic=double(imread(picToRead));
+%read in image and convert it to double format
+pic = im2double(imread(picToRead));
+%pic = pic(:,:,1);
+figure,imshow(pic)
+
+%Change to GrayScale
+[~, columns, numberOfColorChannels] = size(pic);
+if numberOfColorChannels > 1
+    % It's a true color RGB image.  We need to convert to gray scale.
+    grayPic = rgb2gray(pic);
+else
+    % It's already gray scale.  No need to convert.
+    grayPic = pic;
+    fprintf("already gray")
+end
+figure,imshow(grayPic)
+
+figure,imshow(avgFilter(grayPic))
+picSalt = imnoise(grayPic, 'salt & pepper', 0.06); %matlab function to add salt & pepper noise.
+figure,montage({picSalt,medFilt(grayPic)})
+figure,imshow(sobFilter(grayPic))
+figure,montage({grayPic,laplacianFilter(grayPic),laplacianFilter2(grayPic)})
+
+%Extra Filter
+
+%extra = lowPassfilter(size(grayPic),pi/2);
+extra
+
+%% Start Iris problem
+picToRead = './iris.bmp';
+pic = im2double(imread(picToRead));
+%figure,imshow(pic)
+[~, ~, numberOfColorChannels] = size(pic);
+if numberOfColorChannels > 1
+    % It's a true color RGB image.  We need to convert to gray scale.
+    grayPic = rgb2gray(pic);
+else
+    % It's already gray scale.  No need to convert.
+    grayPic = pic;
+    fprintf("already gray")
+end
+%edges = [0 .05:0.1:1 1.5];
+%figure,histogram(grayPic,edges);
+%T = adaptthresh(grayPic,0.3);
+%BW = imbinarize(grayPic,T);
+%edgePic = sobFilter(BW);
+%med = medFilt(edgePic);
+
+edgePic = sobFilter(grayPic);
+edges = [0 .05:0.1:1 1.5];%Use to find better sections to base
+figure, histogram(edgePic,edges);
+BW = imbinarize(edgePic,.01);%Change parameter two based on histogram.
+final = medFilt(BW);%Filter out the pepper.
+
+finalEdge = im2double(sobFilter(final));
+
+%finalPic = finalEdge - edgePic;
+figure,montage({pic,edgePic,BW,final,finalEdge})
+
+
+
+%%
+%Iris try again
+picToRead = './iris.bmp';
+pic = im2double(imread(picToRead));
+
+%figure,imshow(pic)
+[~, ~, numberOfColorChannels] = size(pic);
+if numberOfColorChannels > 1
+    % It's a true color RGB image.  We need to convert to gray scale.
+    grayPic = rgb2gray(pic);
+else
+    % It's already gray scale.  No need to convert.
+    grayPic = pic;
+    fprintf("already gray")
+end
+edgePic = sobFilter(grayPic);
+Imbinary = imbinarize(edgePic);
+Imbinary = medFilt(Imbinary);
+
+[row, col, numberOfColorChannels] = size(Imbinary);
+h = histogram(edgePic);
+level = graythresh(edgePic);
+binaryImage = edgePic > 1;
+
+figure,montage({pic,grayPic,edgePic,Imbinary,binaryImage})
+
+
+
+
+%% All Functions
+
+%Function to find the average pic of any picture given. 
+function avgPicOut = avgFilter(usePic)
+    avgFilt=[1 1 1;
+             1 1 1;
+             1 1 1];%Divide matrix by 9 for the average of them all
+    %xDone=3;
+    %for x=0:xDone%Should I be looping this to get a better smoothing?
+        avgFilt = avgFilt * (1/9);
+    
+        %avgFilt=[2 2 2;2 2 2;2 2 2]/9;
+        %avgPicOut = filter2(usePic,avgFilt,'full');
+        %mesh(avgPicOut)
+        avgPicOut = conv2(usePic,avgFilt);
+    %end
+end
+
+function med = medFilt(usePic)%There has to be a better way to implement this...
+    [rows, col] = size(usePic);%size of grayscale image
+    picSalt = usePic;%Unsure why I did this, to lazy to change now. 
+    pad=zeros(rows,col);
+    for i=2:rows-1
+        for j=2:col-1
+            %Make 3x3 mask
+            filter = [picSalt(i-1,j-1),picSalt(i-1,j),picSalt(i-1,j+1),picSalt(i,j-1),picSalt(i,j),picSalt(i,j+1),picSalt(i+1,j-1),picSalt(i+1,j),picSalt(i+1,j+1)];
+            pad(i,j)= median(filter);%function that just return median value
+        end
+    end
+    med = pad;
+end
+
+function sobelKernel = sobFilter(usePic)
+    sobFiltOne=[-1 0 +1;
+                -2 0 +2;
+                -1 0 +1];%xDirection is done
+    sobFiltTwo=[+1 +2 +1;
+                 0 0 0;
+                -1 -2 -1];%yDirection is done
+    %sobelFiltOneImage = imfilter(usePic,sobFiltOne,'same');
+    %sobelFiltTwoImage = imfilter(usePic,sobFiltTwo,'same');
+        %Working is above.
+    sobelFiltOneImage = conv2(usePic,sobFiltOne);%Another function to loop through picture to apply Kernel
+    sobelFiltTwoImage = conv2(usePic,sobFiltTwo);
+    %sobelFilt#Image = conv2(usePic,sobfilt#,'full');
+        %Why does filter2 flip the image upside down?
+            %conv2(pic, mask) = filter2(rot90(mask,2), pic)
+            %conv2 is a bit faster than fitler, no reason for me to use
+            %filter2 here.  
+    
+    sobelKernel = sqrt(sobelFiltOneImage.^2 + sobelFiltTwoImage.^2);
+      %Edges detected better due to reading the image as a double from the
+      %begging. 
+end
+
+function lapLacian = laplacianFilter(usePic)
+    laplFilt=[-1 -1 -1; 
+              -1 8 -1; 
+              -1 -1 -1];
+    %laplacianFilt = filter2(usePic,laplFilt,'self');
+    lapLacianFilt = conv2(usePic,laplFilt,'same');%This was lapLacianFilt
+    
+    lapLacian = usePic + lapLacianFilt;%Sharpen the image.
+end
+function lapLacian = laplacianFilter2(usePic)
+    laplFilt=[-1 -1 -1; 
+              -1 8 -1; 
+              -1 -1 -1];
+    %laplacianFilt = filter2(usePic,laplFilt,'self');
+    lapLacian = conv2(usePic,laplFilt,'same');%This was lapLacianFilt
+   
+end
+
+function highPass(usePic)
+    origPic = imbinary(usePic);
+    kernelS
+
+end
+
+function fftWithoutMatlab
+    mm=[];
+    A=10;
+    fs=1000;
+    Ts=1/fs;
+    t=(1:1000)*Ts;
+    y=10*sin(2*pi*200*t)+5*sin(2*pi*400*t)+12*sin(2*pi*300*t);
+    N=length(t);
+    for(k=1:N)
+        for(n=1:N)
+            y1(n)=y(n).*exp(-j*2*pi*((-N/2)+n-1)*((-N/2)+k-1)/N);
+        end
+        mm=[mm sum(y1)];
+    end
+    length(mm);
+    f=fs.*(-N/2:N/2-1)/N;
+    figure(1)
+plot(f,2*abs(mm)/N);
+end
+
+
+function [x,y] = circle(center_x, center_y, radius)
+% returns a vector with all circle-corner points containing the correct number of points
+numpoints = ceil(2*radius*pi);
+theta = linspace(0,2*pi, numpoints);
+rho = ones(1,numpoints) * radius;
+[x,y] = pol2cart(theta, rho);
+x = x+center_x;
+y = y+center_y;
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
